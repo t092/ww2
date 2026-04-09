@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="歷史時空探險：戰間期與第二次世界大戰互動學習遊戲，透過拖拉配對與時間軸排序精熟核心知識。">
+  <title>歷史時空探險：戰間期與二戰風雲</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-chapter="3">
+
+  <!-- ===== HUD ===== -->
+  <header class="hud" id="hud" style="display:none;">
+    <div class="hud-level" id="hud-level">第 1 關</div>
+    <div class="hud-score"><span class="icon">⭐</span><span id="hud-score-value">0</span> 分</div>
+    <div class="hud-badges" id="hud-badges"></div>
+  </header>
+
+  <!-- ===== Welcome Screen ===== -->
+  <div class="screen active" id="screen-welcome">
+    <div class="welcome-badge">🌍</div>
+    <h1 class="welcome-title">歷史時空探險</h1>
+    <p class="welcome-subtitle">戰間期與第二次世界大戰<br>透過互動挑戰，穿越八大關卡，精熟歷史核心知識！</p>
+    <div class="level-grid" id="level-grid"></div>
+    <button class="btn btn-primary btn-lg" id="btn-start-game" onclick="startFromFirst()">
+      🚀 開始探險
+    </button>
+  </div>
+
+  <!-- ===== Game Screen ===== -->
+  <div class="screen" id="screen-game">
+    <div class="step-bar" id="step-bar"></div>
+    <div id="game-content"></div>
+    <div class="text-center mt-2" id="game-nav"></div>
+  </div>
+
+  <!-- ===== Achievement Screen ===== -->
+  <div class="screen" id="screen-achievement">
+    <div class="welcome-badge">🏆</div>
+    <h1 class="achievement-title">恭喜通關！</h1>
+    <div class="achievement-rank" id="final-rank"></div>
+    <div class="total-score-display" id="final-score"></div>
+    <div class="final-badges" id="final-badges"></div>
+    <button class="btn btn-primary btn-lg mt-2" onclick="backToMenu()">🏠 返回主選單</button>
+  </div>
+
+  <script src="levelData.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
