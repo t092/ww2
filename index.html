@@ -6,6 +6,10 @@
   <meta name="description" content="歷史時空探險：戰間期與第二次世界大戰互動學習遊戲，透過拖拉配對與時間軸排序精熟核心知識。">
   <title>歷史時空探險：戰間期與二戰風雲</title>
   <link rel="stylesheet" href="style.css">
+
+  <!-- Firebase 9 Compat SDK (Realtime Database) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body data-chapter="3">
 
@@ -13,6 +17,13 @@
   <header class="hud" id="hud" style="display:none;">
     <div class="hud-level" id="hud-level">第 1 關</div>
     <div class="hud-score"><span class="icon">⭐</span><span id="hud-score-value">0</span> 分</div>
+    <!-- 競賽模式標示 -->
+    <div id="hud-battle-indicator" style="display:none;">
+      <span class="battle-badge">⚔️</span>
+      <span class="battle-nick"></span>
+      <span class="battle-sep">·</span>
+      <span class="battle-code"></span>
+    </div>
     <div class="hud-badges" id="hud-badges"></div>
   </header>
 
@@ -22,9 +33,14 @@
     <h1 class="welcome-title">歷史時空探險</h1>
     <p class="welcome-subtitle">戰間期與第二次世界大戰<br>透過互動挑戰，穿越八大關卡，精熟歷史核心知識！</p>
     <div class="level-grid" id="level-grid"></div>
-    <button class="btn btn-primary btn-lg" id="btn-start-game" onclick="startFromFirst()">
-      🚀 開始探險
-    </button>
+    <div class="welcome-buttons">
+      <button class="btn btn-primary btn-lg" id="btn-start-game" onclick="startFromFirst()">
+        🚀 開始探險
+      </button>
+      <button class="btn btn-battle btn-lg" id="btn-battle-mode" onclick="showBattleHome()">
+        🏟️ 競賽模式
+      </button>
+    </div>
   </div>
 
   <!-- ===== Game Screen ===== -->
@@ -44,7 +60,223 @@
     <button class="btn btn-primary btn-lg mt-2" onclick="backToMenu()">🏠 返回主選單</button>
   </div>
 
+  <!-- ===================================================================
+       競賽模式畫面群
+       =================================================================== -->
+
+  <!-- ===== Battle Home（選擇角色）===== -->
+  <div class="screen" id="screen-battle-home">
+    <div class="battle-home-layout">
+      <div class="welcome-badge">🏟️</div>
+      <h1 class="welcome-title">歷史戰場</h1>
+      <p class="welcome-subtitle">競賽模式 — 與同學即時比拼，共爭排行榜！</p>
+
+      <div class="battle-role-grid">
+        <button class="role-card" id="btn-role-teacher" onclick="createRoom()">
+          <div class="role-icon">👨‍🏫</div>
+          <div class="role-title">我是老師</div>
+          <div class="role-desc">建立競賽房間<br>管理與監看排行榜</div>
+        </button>
+        <button class="role-card" id="btn-role-student" onclick="showPlayerJoin()">
+          <div class="role-icon">🎓</div>
+          <div class="role-title">我是學生</div>
+          <div class="role-desc">輸入代碼加入房間<br>與同學爭奪第一！</div>
+        </button>
+      </div>
+
+      <button class="btn btn-secondary mt-2" onclick="backToMenu()">← 返回主選單</button>
+    </div>
+  </div>
+
+  <!-- ===== Host Lobby（老師競賽大廳）===== -->
+  <div class="screen" id="screen-host-lobby">
+
+    <!-- === 等待學生加入 === -->
+    <div id="host-waiting-view">
+      <div class="host-section">
+        <div class="host-header">
+          <span>🏟️ 競賽大廳</span>
+          <span class="host-status-badge status-waiting">⏳ 等待學生加入</span>
+        </div>
+
+        <div class="code-qr-layout">
+          <div class="room-code-box">
+            <div class="room-code-label">競賽房間代碼</div>
+            <div class="room-code-number" id="host-room-code">------</div>
+            <div class="room-code-hint">請將此代碼顯示或傳送給學生</div>
+            <button class="btn btn-secondary" id="btn-copy-code" onclick="copyRoomCode()">📋 複製代碼</button>
+          </div>
+          <div class="qr-box">
+            <div class="qr-label">📱 掃碼加入</div>
+            <div id="host-qr-canvas"></div>
+            <div class="qr-note">使用平板 / 手機掃碼</div>
+            <div class="qr-auto-note">✅ 掃碼後自動帶入代碼</div>
+          </div>
+        </div>
+
+        <div class="host-url-box">
+          <span class="host-url-label">📎 遊戲網址：</span>
+          <span class="host-url" id="host-join-url">—</span>
+        </div>
+
+        <div class="host-instruction">
+          <strong>📋 學生加入步驟（二擇一）：</strong><br>
+          📱 <strong>掃碼：</strong> 平板 / 手機直接掃 QR 碼 → 輸入代號即可<br>
+          💻 <strong>手動：</strong> 開啟網址 → 🏟️ 競賽模式 → 我是學生 → 輸入代碼與代號
+        </div>
+
+        <div class="host-players-section">
+          <div class="host-section-title">
+            👥 已加入學生
+            <span class="player-count-badge" id="host-waiting-count">0</span> 位
+          </div>
+          <div class="waiting-tags" id="host-waiting-players">
+            <span class="lb-empty-sm">尚無學生加入...</span>
+          </div>
+        </div>
+
+        <div class="host-actions">
+          <button class="btn btn-success btn-lg" id="btn-host-start"
+                  onclick="hostStartGame()" disabled>
+            🚀 開始競賽！
+          </button>
+          <button class="btn btn-secondary" onclick="closeRoom()">✖ 取消 / 關閉房間</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- === 競賽進行中（排行榜）=== -->
+    <div id="host-active-view" style="display:none;">
+      <div class="host-section">
+        <div class="host-header">
+          <span>🏟️ 競賽進行中</span>
+          <div class="host-active-meta">
+            <span class="room-code-mini" id="host-code-mini"></span>
+            <span class="host-status-badge status-active">🔴 LIVE</span>
+          </div>
+        </div>
+
+        <div class="host-lb-wrap">
+          <div class="host-lb-header">
+            <span>即時排行榜</span>
+            <span class="player-count-badge" id="host-player-count" style="display:inline-block;"></span>
+          </div>
+          <div id="host-leaderboard">
+            <div class="lb-empty">等待學生得分中...</div>
+          </div>
+        </div>
+
+        <div class="host-actions mt-2">
+          <button class="btn btn-danger btn-lg" onclick="closeRoom()">🏁 結束競賽</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Player Join（學生加入）===== -->
+  <div class="screen" id="screen-player-join">
+    <div class="join-layout">
+      <div class="welcome-badge">⚔️</div>
+      <h1 class="welcome-title">加入競賽</h1>
+      <p class="welcome-subtitle">輸入老師提供的代碼與您的代號</p>
+
+      <div class="join-form">
+        <div class="form-group">
+          <label class="form-label">🔑 房間代碼（6位）</label>
+          <input type="text" class="form-input code-input"
+                 id="input-room-code"
+                 placeholder="例：A3K9P2"
+                 maxlength="6"
+                 autocomplete="off"
+                 autocapitalize="characters"
+                 oninput="this.value = this.value.toUpperCase()"
+                 onkeydown="if(event.key==='Enter') document.getElementById('input-nickname').focus()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">🎭 您的競賽代號（最多12字）</label>
+          <input type="text" class="form-input"
+                 id="input-nickname"
+                 placeholder="例：歷史達人、鋼鐵俠、NO.1..."
+                 maxlength="12"
+                 autocomplete="off"
+                 onkeydown="if(event.key==='Enter') joinRoom()">
+        </div>
+
+        <div id="join-error" class="join-error" style="display:none;"></div>
+
+        <button class="btn btn-primary btn-lg w-full" id="btn-join-room" onclick="joinRoom()">
+          ⚔️ 加入競賽！
+        </button>
+      </div>
+
+      <button class="btn btn-secondary mt-2" onclick="showBattleHome()">← 返回</button>
+    </div>
+  </div>
+
+  <!-- ===== Player Waiting（學生等待室）===== -->
+  <div class="screen" id="screen-player-waiting">
+    <div class="waiting-layout">
+      <div class="waiting-spinner-wrap">
+        <div class="waiting-spinner">⏳</div>
+      </div>
+      <h2 class="waiting-title">等待老師開始競賽</h2>
+      <p class="waiting-sub">老師按下「開始競賽」後，遊戲將自動啟動</p>
+
+      <div class="waiting-info-card">
+        <div class="waiting-info-row">
+          <span class="info-label">🔑 房間代碼</span>
+          <span class="info-value" id="waiting-room-code">---</span>
+        </div>
+        <div class="waiting-info-row">
+          <span class="info-label">🎭 您的代號</span>
+          <span class="info-value" id="waiting-nickname">---</span>
+        </div>
+      </div>
+
+      <div class="waiting-players-section">
+        <div class="waiting-players-title">
+          已加入 <span id="waiting-player-count">1</span> 位參賽者
+        </div>
+        <div class="waiting-tags" id="waiting-player-list"></div>
+      </div>
+
+      <div class="waiting-pulse-row">
+        <span class="waiting-pulse-dot"></span>
+        <span class="waiting-pulse-dot"></span>
+        <span class="waiting-pulse-dot"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       全域疊加層
+       =================================================================== -->
+
+  <!-- 浮動排行榜面板（遊戲進行中顯示）-->
+  <div id="leaderboard-panel" style="display:none;">
+    <div class="panel-header">
+      <span class="panel-title">🏟️ 排行榜</span>
+      <span class="panel-rank" id="panel-my-rank">#-</span>
+      <button class="panel-toggle" id="panel-toggle" onclick="togglePanel()">▼</button>
+    </div>
+    <div id="panel-body">
+      <div id="panel-lb-list"></div>
+    </div>
+  </div>
+
+  <!-- 競賽結束遮罩 -->
+  <div id="battle-end-overlay" style="display:none;">
+    <div class="end-overlay-content">
+      <div class="end-overlay-icon">🏁</div>
+      <h2 class="end-overlay-title">競賽結束！</h2>
+      <p class="end-overlay-sub">感謝您的精彩參與</p>
+      <p class="end-overlay-sub2">即將返回主選單...</p>
+    </div>
+  </div>
+
   <script src="levelData.js"></script>
   <script src="app.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="battle.js"></script>
 </body>
 </html>

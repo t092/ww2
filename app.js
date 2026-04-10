@@ -14,6 +14,19 @@ let state = {
   challengeState: {}
 };
 
+/* ---------- Reset State（競賽模式：清除本地存檔記憶）---------- */
+function resetGameState() {
+  state.score        = 0;
+  state.badges       = [];
+  state.completed    = [];
+  state.levelErrors  = {};
+  state.levelScores  = {};
+  state.challengeState = {};
+  updateHud();
+  renderHudBadges();
+}
+window.resetGameState = resetGameState;
+
 const SCORE_CORRECT = 10;
 const SCORE_WRONG = -5;
 const BONUS_PERFECT = 30;
@@ -29,6 +42,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 /* ---------- Storage ---------- */
 function saveState() {
+  if (window.battleState?.active) return; // 競賽模式不寫入本地存檔
   try { localStorage.setItem('ch03_state', JSON.stringify(state)); } catch(e){}
 }
 function loadState() {
@@ -224,6 +238,10 @@ function addScore(pts) {
   if (state.score < 0) state.score = 0;
   updateHud();
   saveState();
+  // 競賽模式：同步分數到 Firebase
+  if (window.battleState?.active) {
+    window.battlePushScore?.(state.score, state.currentLevel);
+  }
 }
 
 function showScoreFloat(x, y, pts) {
