@@ -27,17 +27,20 @@ const FIREBASE_CONFIG = {
    競賽狀態物件（全域共享）
    ───────────────────────────────────────────── */
 const bs = {
-  active: false,
-  role: null,       // 'host' | 'player'
-  roomId: null,
-  nickname: null,
-  db: null,
-  refs: [],         // Firebase listeners（清理用）
+  active:      false,
+  role:        null,       // 'host' | 'player'
+  roomId:      null,
+  nickname:    null,
+  db:          null,
+  refs:        [],         // Firebase listeners（清理用）
+  battleLevel: -1,         // -1 = 全部關卡，0-7 = 指定關卡 index
+  singleLevel: false       // true = 單一關卡模式
 };
 window.battleState = bs;
 window.battlePushScore = pushScore;
 
 let gameStarted = false; // 防止重複觸發
+let battleSelectedLevel = -1; // 老師建立房間時的選定關卡
 
 /* ─────────────────────────────────────────────
    Firebase 初始化
@@ -94,6 +97,62 @@ function showPlayerJoin() {
   battleSwitchScreen('screen-player-join');
 }
 
+/* ──────────────────────────────────────────────
+   老師：選定競賽關卡步驟（Host Setup）
+   ────────────────────────────────────────────── */
+function showHostSetup() {
+  battleSelectedLevel = -1;
+  battleSwitchScreen('screen-host-setup');
+  renderHostSetupLevels();
+  updateSetupDisplay();
+}
+
+function renderHostSetupLevels() {
+  const grid = document.getElementById('host-setup-level-grid');
+  if (!grid || typeof LEVELS === 'undefined') return;
+  grid.innerHTML = LEVELS.map((lv, i) => `
+    <button class="setup-level-btn" id="setup-lv-${i}" onclick="selectBattleLevel(${i})">
+      <span class="setup-lv-emoji">${lv.emoji}</span>
+      <span class="setup-lv-info">
+        <span class="setup-lv-num">第${lv.id}關</span>
+        <span class="setup-lv-title">${lv.title}</span>
+      </span>
+    </button>
+  `).join('');
+}
+
+function selectBattleLevel(idx) {
+  battleSelectedLevel = idx;
+  // 更新視覺選取狀態
+  const allBtn = document.getElementById('setup-all-btn');
+  document.querySelectorAll('.setup-level-btn').forEach(b => b.classList.remove('setup-selected'));
+  if (allBtn) allBtn.classList.remove('setup-selected');
+  if (idx === -1) {
+    if (allBtn) allBtn.classList.add('setup-selected');
+  } else {
+    const btn = document.getElementById(`setup-lv-${idx}`);
+    if (btn) btn.classList.add('setup-selected');
+  }
+  updateSetupDisplay();
+}
+
+function updateSetupDisplay() {
+  const display = document.getElementById('setup-selected-display');
+  const checkEl = document.getElementById('setup-all-check');
+  if (battleSelectedLevel === -1) {
+    if (display) display.innerHTML = '已選：🌍 全部關卡（依序，從第1關開始）';
+    if (checkEl) checkEl.style.opacity = '1';
+  } else {
+    const lv = typeof LEVELS !== 'undefined' ? LEVELS[battleSelectedLevel] : null;
+    const label = lv ? `${lv.emoji} 第${lv.id}關「${lv.title}」` : `第 ${battleSelectedLevel + 1} 關`;
+    if (display) display.innerHTML = `已選：${label}`;
+    if (checkEl) checkEl.style.opacity = '0';
+  }
+}
+
+window.showHostSetup         = showHostSetup;
+window.selectBattleLevel     = selectBattleLevel;
+
 /* ─────────────────────────────────────────────
    老師：建立房間
    ───────────────────────────────────────────── */
@@ -104,14 +163,17 @@ async function createRoom() {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 建立中...'; }
 
   const code = generateRoomCode();
-  bs.roomId = code;
-  bs.role = 'host';
+  bs.roomId      = code;
+  bs.role        = 'host';
+  bs.battleLevel = battleSelectedLevel;
+  bs.singleLevel = battleSelectedLevel >= 0;
 
   try {
     await bs.db.ref(`rooms/${code}`).set({
-      status: 'waiting',
+      status:    'waiting',
       createdAt: firebase.database.ServerValue.TIMESTAMP,
-      players: {}
+      level:     battleSelectedLevel,   // -1 = all，0+ = 指定關卡 index
+      players:   {}
     });
     bs.active = true;
     renderHostLobby();
@@ -129,6 +191,18 @@ function renderHostLobby() {
   const joinUrl = `${baseUrl}?join=${bs.roomId}`;
   const urlEl = document.getElementById('host-join-url');
   if (urlEl) urlEl.textContent = baseUrl;
+
+  // 顯示競賽關卡資訊
+  const lvInfoEl = document.getElementById('host-level-info');
+  if (lvInfoEl && typeof LEVELS !== 'undefined') {
+    if (bs.battleLevel >= 0) {
+      const lv = LEVELS[bs.battleLevel];
+      lvInfoEl.innerHTML = `<span class="host-lv-badge">🔗 競賽關卡：${lv.emoji} 第${lv.id}關「${lv.title}」（單一關卡模式）</span>`;
+    } else {
+      lvInfoEl.innerHTML = `<span class="host-lv-badge">🔗 競賽關卡：🌍 全部關卡（依序了第一關開始）</span>`;
+    }
+    lvInfoEl.style.display = 'block';
+  }
 
   // 生成 QR 碼（帶入房間代碼的網址）
   const qrEl = document.getElementById('host-qr-canvas');
@@ -292,6 +366,10 @@ async function joinRoom() {
   bs.active = true;
   gameStarted = false;
 
+  // 讀取房間的關卡設定
+  bs.battleLevel = (room.level !== undefined && room.level !== null) ? room.level : -1;
+  bs.singleLevel = bs.battleLevel >= 0;
+
   // 加入玩家記錄
   try {
     await bs.db.ref(`rooms/${code}/players/${nick}`).set({
@@ -363,7 +441,12 @@ function onRoomActive() {
     if (codeEl) codeEl.textContent = bs.roomId;
   }
 
-  startFromFirst(); // app.js 函式
+  // 啟動指定關卡或從第一關開始
+  if (bs.battleLevel >= 0 && typeof startLevel === 'function') {
+    startLevel(bs.battleLevel); // 直接開始指定關卡
+  } else {
+    startFromFirst(); // app.js 函式
+  }
 }
 
 /* ─────────────────────────────────────────────

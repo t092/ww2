@@ -32,14 +32,26 @@
     <div class="welcome-badge">🌍</div>
     <h1 class="welcome-title">歷史時空探險</h1>
     <p class="welcome-subtitle">戰間期與第二次世界大戰<br>透過互動挑戰，穿越八大關卡，精熟歷史核心知識！</p>
+
+    <!-- 自由選關幫 -->  
+    <div id="free-select-banner" class="free-select-banner" style="display:none;">
+      <span>🎯 自由選關模式：點選任意關卡直接開始</span>
+      <button class="btn btn-sm" onclick="disableFreeSelect()">✖ 關閉</button>
+    </div>
+
     <div class="level-grid" id="level-grid"></div>
     <div class="welcome-buttons">
       <button class="btn btn-primary btn-lg" id="btn-start-game" onclick="startFromFirst()">
         🚀 開始探險
       </button>
-      <button class="btn btn-battle btn-lg" id="btn-battle-mode" onclick="showBattleHome()">
-        🏟️ 競賽模式
-      </button>
+      <div class="welcome-row">
+        <button class="btn btn-outline" id="btn-free-select" onclick="enableFreeSelect()">
+          🎯 自由選關
+        </button>
+        <button class="btn btn-battle" id="btn-battle-mode" onclick="showBattleHome()">
+          🏟️ 競賽模式
+        </button>
+      </div>
     </div>
   </div>
 
@@ -72,7 +84,7 @@
       <p class="welcome-subtitle">競賽模式 — 與同學即時比拼，共爭排行榜！</p>
 
       <div class="battle-role-grid">
-        <button class="role-card" id="btn-role-teacher" onclick="createRoom()">
+        <button class="role-card" id="btn-role-teacher" onclick="showHostSetup()">
           <div class="role-icon">👨‍🏫</div>
           <div class="role-title">我是老師</div>
           <div class="role-desc">建立競賽房間<br>管理與監看排行榜</div>
@@ -88,6 +100,44 @@
     </div>
   </div>
 
+  <!-- ===== Host Setup（老師選定競賽關卡）===== -->
+  <div class="screen" id="screen-host-setup">
+    <div class="host-setup-layout">
+      <div class="welcome-badge">🏟️</div>
+      <h1 class="welcome-title" style="font-size:1.6rem;">設定競賽關卡</h1>
+      <p class="welcome-subtitle" style="margin-bottom:16px;">學生要挑戰哪一關？</p>
+
+      <div class="setup-options-wrap">
+        <!-- 全部關卡選項 -->
+        <div class="setup-all-option setup-selected" id="setup-all-btn" onclick="selectBattleLevel(-1)">
+          <span class="setup-all-icon">🌍</span>
+          <div class="setup-all-text">
+            <div class="setup-all-title">全部關卡（依序）</div>
+            <div class="setup-all-desc">從第1關開始，依序挑戰全部8關</div>
+          </div>
+          <span class="setup-check-icon" id="setup-all-check">✓</span>
+        </div>
+
+        <div class="setup-divider">— 或選擇單一關卡 —</div>
+
+        <div class="setup-level-grid" id="host-setup-level-grid">
+          <!-- 由 battle.js 動態產生 -->
+        </div>
+      </div>
+
+      <div class="setup-selected-display" id="setup-selected-display">
+        已選：🌍 全部關卡（依序，從第1關開始）
+      </div>
+
+      <div class="host-actions mt-2">
+        <button class="btn btn-primary btn-lg" id="btn-create-room" onclick="createRoom()">
+          🏟️ 建立競賽房間
+        </button>
+        <button class="btn btn-secondary mt-1" onclick="showBattleHome()">&#8592; 返回</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== Host Lobby（老師競賽大廳）===== -->
   <div class="screen" id="screen-host-lobby">
 
@@ -98,6 +148,9 @@
           <span>🏟️ 競賽大廳</span>
           <span class="host-status-badge status-waiting">⏳ 等待學生加入</span>
         </div>
+
+        <!-- 競賽關卡指示 -->
+        <div id="host-level-info" class="host-level-info" style="display:none;"></div>
 
         <div class="code-qr-layout">
           <div class="room-code-box">

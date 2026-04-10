@@ -27,6 +27,29 @@ function resetGameState() {
 }
 window.resetGameState = resetGameState;
 
+/* ---------- Free Select Mode（自由選關）---------- */
+let freeSelectMode = false;
+
+function enableFreeSelect() {
+  freeSelectMode = true;
+  renderLevelGrid();
+  const banner = document.getElementById('free-select-banner');
+  if (banner) banner.style.display = 'flex';
+  const btn = document.getElementById('btn-free-select');
+  if (btn) { btn.textContent = '✖ 取消選關'; btn.classList.add('btn-outline-active'); }
+}
+
+function disableFreeSelect() {
+  freeSelectMode = false;
+  renderLevelGrid();
+  const banner = document.getElementById('free-select-banner');
+  if (banner) banner.style.display = 'none';
+  const btn = document.getElementById('btn-free-select');
+  if (btn) { btn.textContent = '🎯 自由選關'; btn.classList.remove('btn-outline-active'); }
+}
+window.enableFreeSelect  = enableFreeSelect;
+window.disableFreeSelect = disableFreeSelect;
+
 const SCORE_CORRECT = 10;
 const SCORE_WRONG = -5;
 const BONUS_PERFECT = 30;
@@ -60,6 +83,7 @@ function showScreen(id) {
 }
 
 function backToMenu() {
+  disableFreeSelect();
   showScreen('screen-welcome');
   renderLevelGrid();
 }
@@ -70,15 +94,21 @@ function renderLevelGrid() {
   grid.innerHTML = '';
   LEVELS.forEach((lv, i) => {
     const done = state.completed.includes(lv.id);
-    const unlocked = i === 0 || state.completed.includes(LEVELS[i-1].id);
+    const normalUnlocked = i === 0 || state.completed.includes(LEVELS[i-1].id);
+    const accessible = normalUnlocked || freeSelectMode;
     const card = document.createElement('div');
-    card.className = `level-card${done?' completed':''}${!unlocked?' locked':''}`;
+    card.className = [
+      'level-card',
+      done        ? 'completed' : '',
+      !accessible ? 'locked'    : '',
+      freeSelectMode && !normalUnlocked && !done ? 'free-pick' : ''
+    ].join(' ');
     card.innerHTML = `
       <div class="level-emoji">${lv.emoji}</div>
       <div class="level-name">第${lv.id}關：${lv.title}</div>
       <div class="level-desc">${lv.challenges.length} 個挑戰任務</div>
-      <div class="level-status">${done?'✅':unlocked?'➡️':'🔒'}</div>`;
-    if (unlocked) card.onclick = () => startLevel(i);
+      <div class="level-status">${done?'✅':accessible?(freeSelectMode&&!normalUnlocked?'🎯':'➡️'):'🔒'}</div>`;
+    if (accessible) card.onclick = () => startLevel(i);
     grid.appendChild(card);
   });
 }
@@ -162,6 +192,16 @@ function nextLevelOrFinish() {
   // Award badge
   if (!state.badges.find(b => b.icon === lv.badge.icon)) { state.badges.push(lv.badge); }
   saveState();
+  // 競賽模式：單一關卡完成後，顯示等待訊息而不能進入下一關
+  if (window.battleState?.active && window.battleState?.singleLevel) {
+    const nav = document.getElementById('game-nav');
+    if (nav) nav.innerHTML = `
+      <div class="battle-done-wait">
+        <div class="battle-done-icon">🏁</div>
+        <div class="battle-done-msg">本關挑戰完成！<br>等待老師結束競賽...</div>
+      </div>`;
+    return;
+  }
   if (state.currentLevel < LEVELS.length - 1) {
     startLevel(state.currentLevel + 1);
   } else {
